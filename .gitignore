@@ -1,3 +1,6 @@
 .data/*
 .runs/*
 .checkpoint/*
+data/*
+runs/*
+checkpoint/*
