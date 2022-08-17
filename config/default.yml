@@ -1,0 +1,53 @@
+
+###
+training:
+  batch_size: 2
+  n_epochs: 300 # max num epochs
+  ckpt_path : './checkpoint'
+  log_path : './runs'
+  device : 'cuda:0'
+
+test:
+  ckpt_path : './checkpoint/MIVIA_2022_07_27_08_15'
+  device : 'cuda:1'
+  median_window : 7  #length of median filter used to smooth prediction in inference
+  threshold : 0.7
+
+data: # change with your paths if different.
+  audio_folder : './data/mivia_raw/audio'
+  fs: 16000
+  select_traindata : ['C', 'D']  # C : 14 samples, D : 15 samples
+  select_testdata : ['A']        # A : 14 samples
+  select_valdata : ['B']         # B : 14 samples
+
+opt:
+  lr: 0.001
+
+feats:
+  n_mels: 40
+  hop_length: 256
+  n_fft: 2048
+  win_length: 'None'
+  sample_rate: 16000 #resampling rate
+  power: 1 #1:energy, 2:power
+  net_pooling : 1 # net_pooling = (input frame / output frame). input -> (network, net_pooling) -> output
+  audio_len : 60 # unit : second
+
+
+# """
+# net:
+#   dropout: 0.5
+#   rnn_layers: 2
+#   n_in_channel: 1
+#   nclass: 10
+#   attention: True
+#   n_RNN_cell: 128
+#   activation: glu
+#   rnn_type: BGRU
+#   kernel_size: [3, 3, 3, 3, 3, 3, 3]
+#   padding: [1, 1, 1, 1, 1, 1, 1]
+#   stride: [1, 1, 1, 1, 1, 1, 1]
+#   nb_filters: [ 16, 32, 64, 128, 128, 128, 128 ]
+#   pooling: [ [ 2, 2 ], [ 2, 2 ], [ 1, 2 ], [ 1, 2 ], [ 1, 2 ], [ 1, 2 ], [ 1, 2 ] ]
+#   dropout_recurrent: 0
+# """
