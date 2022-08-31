@@ -1,17 +1,17 @@
 
 ###
 training:
-  batch_size: 2
-  n_epochs: 300 # max num epochs
+  batch_size: 3
+  n_epochs: 150 # max num epochs
   ckpt_path : './checkpoint'
   log_path : './runs'
-  device : 'cuda:0'
+  device : 'cuda:1'
 
 test:
-  ckpt_path : './checkpoint/MIVIA_2022_07_27_08_15'
+  ckpt_path : './checkpoint/MIVIA_2022_08_19_02_00'
   device : 'cuda:1'
   median_window : 7  #length of median filter used to smooth prediction in inference
-  threshold : 0.7
+  threshold : 0.5
 
 data: # change with your paths if different.
   audio_folder : './data/mivia_raw/audio'
@@ -20,11 +20,18 @@ data: # change with your paths if different.
   select_testdata : ['A']        # A : 14 samples
   select_valdata : ['B']         # B : 14 samples
 
+
+data_crawling:
+  audio_folder : './data/nina/Audio'
+  fs : 44100
+  pad_to : 10
+
+
 opt:
   lr: 0.001
 
 feats:
-  n_mels: 40
+  n_mels: 128
   hop_length: 256
   n_fft: 2048
   win_length: 'None'

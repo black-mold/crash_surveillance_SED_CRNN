@@ -97,6 +97,14 @@ validation_data = mivia(
     fs = conf['feats']['sample_rate']
     )
 
+nina_test_data = NINA(
+    conf['data_crawling']['audio_folder'], 
+    transform = MelSpectrogram_transform(conf['feats']),
+    target_transform= None, 
+    pad_to = conf['data_crawling']['pad_to'],
+    fs = conf['data_crawling']['fs']
+    )
+
 
 ########################################################################################################################
 #                                     device, hyperparameter, tensorboard configuration                                #
@@ -135,9 +143,10 @@ else:
 writer = SummaryWriter(log_dir = log_dir)
 
 
-train_dataloader = DataLoader(training_data, batch_size, shuffle=True)       # C, D
-validation_dataloader = DataLoader(validation_data, 1, shuffle = True) # B
-test_dataloader = DataLoader(test_data, 1, shuffle = False)             # A
+train_dataloader = DataLoader(training_data, batch_size, shuffle=True)  # C, D
+validation_dataloader = DataLoader(validation_data, 1, shuffle = True)  # B
+test_dataloader = DataLoader(test_data, 1, shuffle = False)
+nina_test_dataloader = DataLoader(nina_test_data, 1, shuffle = False)             # A
 
 
 
@@ -210,7 +219,7 @@ def validation(dataloader, model, loss_fn):
 
             ### 임시로 추가 2
 
-            label_binary = torch.ge(y, 0.5)
+            label_binary = torch.ge(y, float(conf['test']['threshold']))
             # import pdb
             # pdb.set_trace()
 
@@ -251,6 +260,7 @@ def test(dataloader, model, loss_fn):
     with torch.no_grad():
         for i, (X, y) in enumerate(dataloader):
             X, y = X.to(device), y.to(device) #  X   : [batchsize, frequency, frame]
+            print(X.shape)
             pred = model(X[:,:,:3750])        # pred : [batchsize, frame, class]
             test_loss += loss_fn(pred, y).item()
 
@@ -258,7 +268,7 @@ def test(dataloader, model, loss_fn):
 
 
             ### 임시로 추가 2
-            label_binary = torch.ge(y, 0.5)
+            label_binary = torch.ge(y, float(conf['test']['threshold']))
 
             post = median_filter(pred, conf['test']['median_window'], conf['test']['threshold']) # 이건 계속 쓰는거임. [batchsize, frame, class]
             post = post.to(device)
@@ -267,15 +277,9 @@ def test(dataloader, model, loss_fn):
             score += F1_score(post, is_correct,y)
             ### 임시로 추가 
 
-            
-            # plot_spectrogram(X.cpu().squeeze(), title = f'{i}')
-            # matplotlib_label_show(y.cpu().squeeze(), title = f'label {i}')
-            # matplotlib_label_show(pred.detach().cpu().squeeze(), title = f'prediction {i}')
-            # matplotlib_label_show(mod_binary.detach().cpu().squeeze(), title = f'post {i}')  
-            
+            result_show_graph(spec = X[:,:,:3750], target = y, pred = pred, post = post, i = i, log_dir = log_dir)
+            result_show_matrix(spec = X[:,:,:3750], target = y, pred = pred, post = post, i = i, log_dir = log_dir)
 
-            result_show(X, y, pred, post, i)          
-            
 
             # writer.add_image(f'spectrogram{i}', plot_spectrogram(X.cpu().squeeze(), title = f'{i}'))
             # writer.add_image(f'label{i}', matplotlib_label_show(y.cpu().squeeze(), title = f'label {i}'))
@@ -296,6 +300,58 @@ def test(dataloader, model, loss_fn):
     print(f"test Error: \n Accuracy: {(100*correct):>0.1f}%, Avg loss: {test_loss:>8f}, f1 : {score} \n")
 
     return test_loss
+
+def test_crawling(dataloader, model):
+
+    ### 로드 추가(only model)
+    model, _, _, _, _ = load_bestmodel(PATH = conf['test']['ckpt_path'], model = model, optimizer = optimizer, device = torch.device('cuda')) # best model
+
+    model.eval()
+    # test_loss, correct = 0, 0
+
+    # score = 0.0 #임시로 추가 1
+
+    with torch.no_grad():
+        for i, X in enumerate(dataloader):
+            # import pdb
+            # pdb.set_trace()
+            X = X.to(device) #  X   : [batchsize, frequency, frame]
+            print(X.shape)
+            pred = model(X)        # pred : [batchsize, frame, class]
+
+            # input feature visualization torch.ge(pred, 0.5)
+
+
+            ### 임시로 추가 2
+
+            post = median_filter(pred, conf['test']['median_window'], conf['test']['threshold']) # 이건 계속 쓰는거임. [batchsize, frame, class]
+            post = post.to(device)
+
+            ### 임시로 추가 
+
+            result_show_graph(spec = X, target = None, pred = pred, post = post, i = i, log_dir = log_dir)
+            result_show_matrix(spec = X, target = None, pred = pred, post = post, i = i, log_dir = log_dir)          
+            
+
+            # writer.add_image(f'spectrogram{i}', plot_spectrogram(X.cpu().squeeze(), title = f'{i}'))
+            # writer.add_image(f'label{i}', matplotlib_label_show(y.cpu().squeeze(), title = f'label {i}'))
+            # writer.add_image(f'prediction{i}', matplotlib_label_show(pred.detach().cpu().squeeze(), title = f'prediction {i}'))
+            # writer.add_image(f'post{i}', matplotlib_label_show(mod_binary.detach().cpu().squeeze(), title = f'post {i}'))
+
+            # correct = 0
+            # correct += (pred.argmax(1) == /y).type(torch.float).sum().item()
+
+    # test_loss /= num_batches
+    # correct /= size
+
+    # score /= num_batches # 임시로 추가 3
+
+
+    # # ...학습 중 손실(running loss)을 기록하고
+    # writer.add_scalar('test loss', test_loss)
+    # print(f"test Error: \n Accuracy: {(100*correct):>0.1f}%, Avg loss: {test_loss:>8f}, f1 : {score} \n")
+
+    # return test_loss
 
 
 
@@ -335,3 +391,4 @@ if args.mode == 'train' :
 # Test the model
 else : 
     test_loss = test(test_dataloader, model, loss_fn)
+    test_crawling(nina_test_dataloader, model)

@@ -101,6 +101,7 @@ class mivia(Dataset):
     def __getitem__(self, idx):
 
         target = self.encoder.encoder_strong_label(self.xml_path[idx]) # label load(xml file -> numpy)
+        # target shape : [frame, class]
 
         audio_path = audio_path_loader(self.xml_path[idx])
         audio_data, _ = read_audio(audio_path, self.pad_to, self.resample_rate) # data load, fs = 32000(default)
@@ -111,3 +112,33 @@ class mivia(Dataset):
             audio_data = spectrogram(audio_data) # [freq, frame]
 
         return audio_data, target
+
+
+
+class NINA(Dataset):
+    def __init__(self, Audio_dir, transform = None, target_transform = None, pad_to = 10, fs = 44100):
+
+        self.Audio_dir = Audio_dir
+        self.resample_rate = fs # resampling rate
+        self.pad_to = pad_to * self.resample_rate # unit of pad_to : [second]
+
+        self.transform = transform
+        self.target_transform = target_transform
+
+        self.Audio_file_list = os.listdir(self.Audio_dir)
+
+
+    def __len__(self):
+        return len(self.Audio_file_list)  
+
+    def __getitem__(self, idx):
+
+        audio_data, _ = read_audio(os.path.join(self.Audio_dir, self.Audio_file_list[idx]), self.pad_to, self.resample_rate) # data load, fs = 32000(default)
+        print(self.Audio_file_list[idx])
+
+        if self.transform: #data transform
+            # transform. use this function to extract features in dataloader
+            spectrogram = self.transform
+            audio_data = spectrogram(audio_data) # [freq, frame]
+
+        return audio_data

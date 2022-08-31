@@ -1,3 +1,4 @@
+import os
 import xml.etree.ElementTree as ET
 import matplotlib.pyplot as plt
 import numpy as np
@@ -59,37 +60,89 @@ class multi_label_encoder:
         return (target)
 
 
-def matplotlib_label_show(target):
-    n_frame = target.shape[0] # target.shape[0] = segment
-
-    fig = plt.figure()
-    ax1 = fig.add_subplot(111)
-
-    x = np.arange(n_frame)  #(60,)
-    y1 = target[:,0]        #(60,) 
-    y2 = target[:,1]        #(60,) tire skidding
-    y3 = target[:,2]        #(60,) car crash
-
-    ax1.plot(x, y1, label = 'scream')
-    ax1.plot(x, y2, label = 'tire skidding', color = 'orange')
-    ax1.plot(x, y3, label = 'car crash', color = 'green')
+def median_filter(pred, median_window, thresholds):
+    # pred : [batch, frame, class]
+    pred = pred.squeeze() # [frame, class]
+    post_filter = scipy.ndimage.filters.median_filter(pred.cpu().detach().numpy(), (median_window, 1)) # [frames, class]
+    post_filter = (post_filter>thresholds).astype(float)
+    
+    return torch.Tensor(post_filter).unsqueeze(0) #  [batch, frame, class] &tensor, float, cpu
 
 
-    ax1.legend(framealpha = 1, loc = 'lower right', bbox_to_anchor=(1.4,0))
-    # ax1.set_title('{}'.format(xmlfile))
+################################################################################################################
+#####################################          Image show function       #######################################
+################################################################################################################
 
 
-    plt.show()
-
-
-def result_show(spec, target, pred, post, i, title=None, ylabel='freq_bin', aspect='auto', xmax=None):
-
+def result_show_matrix(spec, target = None, pred = None, post = None, i = None, title=None, ylabel='freq_bin', aspect='auto', xmax=None, log_dir = None):
     spec = spec.cpu().squeeze()
-    target = target.cpu().squeeze()
+    if target is not None: target = target.cpu().squeeze()
     pred = pred.detach().cpu().squeeze()
     post = post.detach().cpu().squeeze()
 
-    n_frame = target.shape[0] # target.shape[0] = segment
+    fig = plt.figure()
+
+    # spectrogram
+    ax1 = plt.subplot(221)
+    ax1.set_title(title or 'Spectrogram (db)')
+    ax1.set_ylabel(ylabel)
+    ax1.set_xlabel('frame')
+    im = ax1.imshow(librosa.power_to_db(spec), origin='lower', aspect=aspect)
+    if xmax:
+        ax1.set_xlim((0, xmax))
+    fig.colorbar(im, ax=ax1)
+
+
+    if target is not None:
+        # label, target
+        ax2 = plt.subplot(222)
+        ax2.set_title('label')
+        ax2.set_ylabel('classes')
+        ax2.set_xlabel('frame')
+        im = ax2.imshow(target.T, aspect='auto', interpolation='nearest', cmap='viridis')
+        plt.yticks([0, 1, 2], ['scream', 'tire', 'crash'])
+        fig.colorbar(im, ax=ax2)
+
+    # inference, prediction
+    ax3 = plt.subplot(223)
+    ax3.set_title('Pred')
+    ax3.set_ylabel('classes')
+    ax3.set_xlabel('frame')
+    im = ax3.imshow(pred.T, aspect='auto', interpolation='nearest', cmap='viridis')
+    plt.yticks([0, 1, 2], ['scream', 'tire', 'crash'])
+    fig.colorbar(im, ax=ax3)
+
+    # after post processing
+    ax4 = plt.subplot(224)
+    ax4.set_title('post')
+    ax4.set_ylabel('classes')
+    ax4.set_xlabel('frame')
+    im = ax4.imshow(post.T, aspect='auto', interpolation='nearest', cmap='viridis')
+    plt.yticks([0, 1, 2], ['scream', 'tire', 'crash'])
+    fig.colorbar(im, ax=ax4)
+
+
+    fig.subplots_adjust(wspace = 0.5, hspace=0.5)
+    fig.suptitle(f'{i+1}th audio')
+
+    if not os.path.isdir(log_dir):
+        os.makedirs(log_dir)
+
+    if target is None:
+        plt.savefig(f'{log_dir}/NINA_matrix_{i+1}th.jpg', dpi=200)
+    else:
+        plt.savefig(f'{log_dir}/matrix_{i+1}th.jpg', dpi=200)
+    plt.close()
+
+
+def result_show_graph(spec, target = None, pred = None, post = None, i = None, title=None, ylabel='freq_bin', aspect='auto', xmax=None, log_dir = None):
+
+    spec = spec.cpu().squeeze()
+    if target is not None: target = target.cpu().squeeze()
+    pred = pred.detach().cpu().squeeze()
+    post = post.detach().cpu().squeeze()
+
+    n_frame = spec.shape[1] # target.shape[0] = segment
 
     fig = plt.figure()
 
@@ -104,19 +157,20 @@ def result_show(spec, target, pred, post, i, title=None, ylabel='freq_bin', aspe
     fig.colorbar(im, ax=ax1)
 
 
-
+    x = np.arange(n_frame)
     # label
-    ax2 = fig.add_subplot(222)
+    if target is not None:
+        ax2 = fig.add_subplot(222)
 
-    x = np.arange(n_frame)  #(60,)
-    y1 = target[:,0]        #(60,) 
-    y2 = target[:,1]        #(60,) tire skidding
-    y3 = target[:,2]        #(60,) car crash
+          #(60,)
+        y1 = target[:,0]        #(60,) 
+        y2 = target[:,1]        #(60,) tire skidding
+        y3 = target[:,2]        #(60,) car crash
 
-    ax2.plot(x, y1, label = 'scream')
-    ax2.plot(x, y2, label = 'tire skidding', color = 'orange')
-    ax2.plot(x, y3, label = 'car crash', color = 'green')
-    ax2.set_title('label')
+        ax2.plot(x, y1, label = 'scream')
+        ax2.plot(x, y2, label = 'tire skidding', color = 'orange')
+        ax2.plot(x, y3, label = 'car crash', color = 'green')
+        ax2.set_title('label')
 
     ax3 = fig.add_subplot(223)
 
@@ -145,31 +199,26 @@ def result_show(spec, target, pred, post, i, title=None, ylabel='freq_bin', aspe
     fig.subplots_adjust(hspace=0.5)
     fig.suptitle(f'{i+1}th audio')
 
+    if target is None:
+        plt.savefig(f'{log_dir}/NINA_graph_{i+1}th.jpg', dpi=200)
+    else:
+        plt.savefig(f'{log_dir}/graph_{i+1}th.jpg', dpi=200)
+    plt.close()
 
-    plt.show()
 
-
-def plot_spectrogram(spec, title=None, ylabel='freq_bin', aspect='auto', xmax=None):
-  fig, axs = plt.subplots(1, 1)
-  axs.set_title(title or 'Spectrogram (db)')
-  axs.set_ylabel(ylabel)
-  axs.set_xlabel('frame')
-  im = axs.imshow(librosa.power_to_db(spec), origin='lower', aspect=aspect)
-  if xmax:
-    axs.set_xlim((0, xmax))
-  fig.colorbar(im, ax=axs)
-  plt.show(block=False)
+# def plot_spectrogram(spec, title=None, ylabel='freq_bin', aspect='auto', xmax=None):
+#   fig, axs = plt.subplots(1, 1)
+#   axs.set_title(title or 'Spectrogram (db)')
+#   axs.set_ylabel(ylabel)
+#   axs.set_xlabel('frame')
+#   im = axs.imshow(librosa.power_to_db(spec), origin='lower', aspect=aspect)
+#   if xmax:
+#     axs.set_xlim((0, xmax))
+#   fig.colorbar(im, ax=axs)
+#   plt.show(block=False)
 
 # def fig2np(fig):
 #     data = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8, sep='')
 #     data = data.reshape(fig.canvas.get_width_height()[::-1] + (3,))
 #     return data
 
-
-def median_filter(pred, median_window, thresholds):
-    # pred : [batch, frame, class]
-    pred = pred.squeeze() # [frame, class]
-    post_filter = scipy.ndimage.filters.median_filter(pred.cpu().detach().numpy(), (median_window, 1)) # [frames, class]
-    post_filter = (post_filter>thresholds).astype(float)
-    
-    return torch.Tensor(post_filter).unsqueeze(0) #  [batch, frame, class] &tensor, float, cpu
