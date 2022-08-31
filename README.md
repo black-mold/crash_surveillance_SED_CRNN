@@ -11,6 +11,7 @@ car crash surveillance system using SED
 
 # Requirements
 
+- TBA
 
 
 
@@ -25,8 +26,10 @@ python run.py -m train -c ./config/default.yml
 
 
 # Test code
+python run.py -m test -c ./config/default.yml 
 ```
 
+- Before test, change ./config/default.yml
 
 
 # Reference
